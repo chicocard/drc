@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modelo de Markov - Doença Renal Crônica</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f5f5f5;
+            border-bottom: 2px solid #ddd;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1em;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            background: #e0e0e0;
+        }
+
+        .tab.active {
+            background: white;
+            color: #1565C0;
+            border-bottom: 3px solid #1565C0;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 30px;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .controls {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #1565C0;
+            cursor: pointer;
+        }
+
+        .control-group input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .value-display {
+            display: inline-block;
+            background: #1565C0;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .chart-container {
+            margin: 20px 0;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .stat-card h3 {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #1565C0;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #1565C0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .warning-box {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .footer {
+            background: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+
+        .btn {
+            background: #1565C0;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: #0D47A1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            background: #757575;
+        }
+
+        .btn-secondary:hover {
+            background: #616161;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+        }
+
+        .btn-success:hover {
+            background: #388E3C;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .editable-table {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .editable-table input {
+            width: 80px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .tab {
+                padding: 12px 20px;
+                font-size: 0.9em;
+            }
+            
+            .tab-content {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Modelo de Cadeia de Markov para Doença Renal Crônica</h1>
+            <p>Simulação Interativa e Customizável da Progressão da DRC</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('simulacao')">📊 Simulação</button>
+            <button class="tab" onclick="showTab('parametros')">⚙️ Parâmetros</button>
+            <button class="tab" onclick="showTab('matriz')">🔢 Matriz de Transição</button>
+            <button class="tab" onclick="showTab('estatisticas')">📈 Estatísticas</button>
+            <button class="tab" onclick="showTab('documentacao')">ℹ️ Documentação</button>
+        </div>
+
+        <div id="simulacao" class="tab-content active">
+            <h2>Simulação da Evolução das Prevalências</h2>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label>Número de anos para simular: <span class="value-display" id="anos-value">20</span></label>
+                    <input type="range" id="anos-slider" min="5" max="50" value="20" oninput="updateAnos(this.value)">
+                </div>
+                
+                <button class="btn" onclick="runSimulation()">▶️ Executar Simulação</button>
+                <button class="btn btn-secondary" onclick="resetToDefaults()">🔄 Restaurar Padrões</button>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart-evolucao"></div>
+            </div>
+
+            <div class="chart-container">
+                <div id="chart-area"></div>
+            </div>
+
+            <div class="chart-container">
+                <h3>Tabela de Prevalências (%)</h3>
+                <div id="tabela-prevalencias" style="overflow-x: auto;"></div>
+            </div>
+        </div>
+
+        <div id="parametros" class="tab-content">
+            <h2>⚙️ Customização de Parâmetros</h2>
+
+            <div class="warning-box">
+                <strong>⚠️ Atenção:</strong> Modifique estes valores apenas se você tiver dados específicos da sua área de cobertura. Os valores padrão são baseados em estudos epidemiológicos internacionais.
+            </div>
+
+            <div class="grid-2">
+                <div>
+                    <h3>Prevalências Iniciais (%)</h3>
+                    <div class="info-box">
+                        Digite as prevalências observadas na sua população. A soma não precisa ser exatamente 100%.
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Estado</th>
+                                <th>Prevalência (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-prevalencias-edit"></tbody>
+                    </table>
+                    <button class="btn btn-success" onclick="savePrevalencias()">💾 Salvar Prevalências</button>
+                </div>
+
+                <div>
+                    <h3>Probabilidades de Transição Principais</h3>
+                    <div class="info-box">
+                        Ajuste as probabilidades anuais de transição mais importantes. Valores entre 0 e 1.
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Transição</th>
+                                <th>Probabilidade</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-transicoes-edit"></tbody>
+                    </table>
+                    <button class="btn btn-success" onclick="saveTransicoes()">💾 Salvar Transições</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn" onclick="showTab('matriz')">➡️ Ver Matriz Completa</button>
+                <button class="btn btn-secondary" onclick="resetToDefaults(); alert('Parâmetros restaurados aos valores padrão!');">🔄 Restaurar Todos os Padrões</button>
+            </div>
+        </div>
+
+        <div id="matriz" class="tab-content">
+            <h2>Matriz de Probabilidades de Transição</h2>
+            
+            <div class="info-box">
+                <strong>📌 Edição Avançada:</strong> Você pode editar qualquer célula da matriz abaixo. Certifique-se de que cada linha soma aproximadamente 1.0 (100%).
+            </div>
+
+            <div class="chart-container">
+                <div id="chart-heatmap"></div>
+            </div>
+
+            <div class="chart-container editable-table">
+                <h3>Matriz Editável</h3>
+                <div id="tabela-matriz-edit"></div>
+                <button class="btn btn-success" onclick="saveMatrizCompleta()">💾 Salvar Matriz Completa</button>
+                <button class="btn btn-secondary" onclick="validateMatriz()">✅ Validar Matriz</button>
+            </div>
+
+            <div id="validacao-resultado"></div>
+        </div>
+
+        <div id="estatisticas" class="tab-content">
+            <h2>Estatísticas do Modelo</h2>
+
+            <div class="stats-grid" id="stats-cards"></div>
+
+            <div class="chart-container">
+                <div id="chart-expectativa"></div>
+            </div>
+
+            <div class="chart-container">
+                <h3>Probabilidades de Transição por Tipo</h3>
+                <div class="grid-2">
+                    <div>
+                        <h4>Progressão (Piora)</h4>
+                        <table id="tabela-progressao"></table>
+                    </div>
+                    <div>
+                        <h4>Regressão (Melhora)</h4>
+                        <table id="tabela-regressao"></table>
+                    </div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <h4>Mortalidade por Estado</h4>
+                    <table id="tabela-mortalidade"></table>
+                </div>
+            </div>
+        </div>
+
+        <div id="documentacao" class="tab-content">
+            <h2>Documentação do Modelo</h2>
+
+            <div class="info-box">
+                <h3>Sobre o Modelo de Markov para DRC</h3>
+                <p>Este modelo representa a história natural e progressão da Doença Renal Crônica através de uma <strong>cadeia de Markov discreta no tempo</strong> com ciclos anuais.</p>
+            </div>
+
+            <h3>Estados de Saúde</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Estado</th>
+                        <th>eGFR (mL/min/1,73m²)</th>
+                        <th>Descrição</th>
+                        <th>Prevalência Padrão</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>G1</td><td>≥90</td><td>Normal ou elevado</td><td>3,5%</td></tr>
+                    <tr><td>G2</td><td>60-89</td><td>Levemente diminuído</td><td>3,9%</td></tr>
+                    <tr><td>G3a</td><td>45-59</td><td>Moderadamente diminuído</td><td>4,5%</td></tr>
+                    <tr><td>G3b</td><td>30-44</td><td>Moderado a gravemente diminuído</td><td>3,1%</td></tr>
+                    <tr><td>G4</td><td>15-29</td><td>Gravemente diminuído</td><td>0,4%</td></tr>
+                    <tr><td>G5</td><td>&lt;15</td><td>Falência renal</td><td>0,1%</td></tr>
+                    <tr><td>Diálise</td><td>-</td><td>HD ou DP</td><td>0,5%</td></tr>
+                    <tr><td>Transplante</td><td>-</td><td>Enxerto funcionante</td><td>0,2%</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Como Customizar para Sua Área</h3>
+            <ol style="line-height: 2;">
+                <li><strong>Colete dados locais:</strong> Obtenha prevalências e taxas de transição da sua área de cobertura</li>
+                <li><strong>Acesse a aba Parâmetros:</strong> Modifique as prevalências iniciais e probabilidades principais</li>
+                <li><strong>Para ajustes avançados:</strong> Use a aba Matriz para editar todas as probabilidades</li>
+                <li><strong>Valide os dados:</strong> Certifique-se de que cada linha da matriz soma aproximadamente 1.0</li>
+                <li><strong>Execute a simulação:</strong> Veja os resultados projetados para sua população</li>
+            </ol>
+
+            <h3>Fundamentação Científica (Valores Padrão)</h3>
+            <ol style="line-height: 2;">
+                <li>Kovesdy CP (2022) - Prevalências globais por estágio</li>
+                <li>Liu P et al. (2021) - Probabilidades de progressão/regressão</li>
+                <li>Vesga JI et al. (2021) - Taxas de transição</li>
+                <li>KDIGO 2024 - Classificação e guidelines</li>
+            </ol>
+
+            <h3>Aplicações</h3>
+            <ul style="line-height: 2;">
+                <li>Planejamento de capacidade de serviços de saúde</li>
+                <li>Projeção de demanda por diálise e transplante</li>
+                <li>Análise de custo-efetividade de intervenções</li>
+                <li>Benchmarking de taxas observadas vs. esperadas</li>
+                <li>Educação sobre história natural da DRC</li>
+            </ul>
+
+            <div class="warning-box">
+                <strong>⚠️ Limitações:</strong>
+                <ul>
+                    <li>Modelo assume probabilidades constantes ao longo do tempo</li>
+                    <li>Não estratifica por idade, sexo ou comorbidades</li>
+                    <li>Não incorpora albuminúria como dimensão adicional</li>
+                    <li>Valores padrão baseados em coortes internacionais</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Modelo de Cadeia de Markov para Doença Renal Crônica</strong></p>
+            <p>Desenvolvido para planejamento de serviços de saúde e análise epidemiológica</p>
+            <p><em>Versão 2.0 - Customizável - Outubro 2025</em></p>
+        </div>
+    </div>
+
+    <script>
+        // Matriz de transição padrão
+        const P_DEFAULT = [
+            [0.820, 0.075, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.105],
+            [0.046, 0.840, 0.060, 0.000, 0.000, 0.000, 0.000, 0.000, 0.054],
+            [0.000, 0.040, 0.850, 0.055, 0.000, 0.000, 0.000, 0.000, 0.055],
+            [0.000, 0.000, 0.035, 0.800, 0.080, 0.000, 0.000, 0.000, 0.085],
+            [0.000, 0.000, 0.000, 0.025, 0.750, 0.120, 0.030, 0.000, 0.075],
+            [0.000, 0.000, 0.000, 0.000, 0.000, 0.600, 0.250, 0.050, 0.100],
+            [0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.800, 0.080, 0.120],
+            [0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.040, 0.935, 0.025],
+            [0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 1.000]
+        ];
+
+        const PREV_DEFAULT = [0.035, 0.039, 0.045, 0.031, 0.004, 0.001, 0.005, 0.002, 0.000];
+
+        const estados = ['G1', 'G2', 'G3a', 'G3b', 'G4', 'G5', 'Diálise', 'Transplante', 'Óbito'];
+        const cores = ['#2E7D32', '#66BB6A', '#FDD835', '#FB8C00', '#E53935', '#C62828', '#1565C0', '#7E57C2', '#424242'];
+        
+        let P = JSON.parse(JSON.stringify(P_DEFAULT));
+        let prevalenciasInicial = [...PREV_DEFAULT];
+        let anosSimulacao = 20;
+
+        // Inicializar tabelas de edição
+        function initEditTables() {
+            // Tabela de prevalências
+            let html = '';
+            for (let i = 0; i < 8; i++) {
+                html += `<tr>
+                    <td><strong>${estados[i]}</strong></td>
+                    <td><input type="number" id="prev-${i}" value="${(prevalenciasInicial[i] * 100).toFixed(2)}" 
+                        min="0" max="100" step="0.01" style="width: 100px;"></td>
+                </tr>`;
+            }
+            document.getElementById('tabela-prevalencias-edit').innerHTML = html;
+
+            // Tabela de transições principais
+            const transicoesImportantes = [
+                {de: 0, para: 1, nome: 'G1 → G2 (Progressão)'},
+                {de: 1, para: 2, nome: 'G2 → G3a (Progressão)'},
+                {de: 2, para: 3, nome: 'G3a → G3b (Progressão)'},
+                {de: 3, para: 4, nome: 'G3b → G4 (Progressão)'},
+                {de: 4, para: 5, nome: 'G4 → G5 (Progressão)'},
+                {de: 5, para: 6, nome: 'G5 → Diálise'},
+                {de: 1, para: 0, nome: 'G2 → G1 (Regressão)'},
+                {de: 2, para: 1, nome: 'G3a → G2 (Regressão)'},
+                {de: 3, para: 2, nome: 'G3b → G3a (Regressão)'},
+                {de: 4, para: 3, nome: 'G4 → G3b (Regressão)'},
+                {de: 6, para: 7, nome: 'Diálise → Transplante'},
+                {de: 7, para: 6, nome: 'Transplante → Diálise'},
+            ];
+
+            html = '';
+            transicoesImportantes.forEach(t => {
+                html += `<tr>
+                    <td>${t.nome}</td>
+                    <td><input type="number" id="trans-${t.de}-${t.para}" value="${P[t.de][t.para].toFixed(3)}" 
+                        min="0" max="1" step="0.001" style="width: 100px;"></td>
+                </tr>`;
+            });
+            document.getElementById('tabela-transicoes-edit').innerHTML = html;
+
+            // Matriz completa editável
+            createEditableMatriz();
+        }
+
+        function createEditableMatriz() {
+            let html = '<table><thead><tr><th>De / Para</th>';
+            estados.forEach(e => html += `<th>${e}</th>`);
+            html += '</tr></thead><tbody>';
+
+            P.forEach((row, i) => {
+                html += `<tr><td><strong>${estados[i]}</strong></td>`;
+                row.forEach((val, j) => {
+                    html += `<td><input type="number" id="mat-${i}-${j}" value="${val.toFixed(3)}" 
+                        min="0" max="1" step="0.001" style="width: 70px;"></td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('tabela-matriz-edit').innerHTML = html;
+        }
+
+        function savePrevalencias() {
+            for (let i = 0; i < 8; i++) {
+                const val = parseFloat(document.getElementById(`prev-${i}`).value) / 100;
+                if (!isNaN(val) && val >= 0 && val <= 1) {
+                    prevalenciasInicial[i] = val;
+                }
+            }
+            alert('✅ Prevalências salvas com sucesso!');
+            runSimulation();
+        }
+
+        function saveTransicoes() {
+            const inputs = document.querySelectorAll('[id^="trans-"]');
+            inputs.forEach(input => {
+                const [_, de, para] = input.id.split('-').map(Number);
+                const val = parseFloat(input.value);
+                if (!isNaN(val) && val >= 0 && val <= 1) {
+                    P[de][para] = val;
+                }
+            });
+            alert('✅ Probabilidades de transição salvas com sucesso!');
+            createEditableMatriz();
+            runSimulation();
+        }
+
+        function saveMatrizCompleta() {
+            for (let i = 0; i < 9; i++) {
+                for (let j = 0; j < 9; j++) {
+                    const val = parseFloat(document.getElementById(`mat-${i}-${j}`).value);
+                    if (!isNaN(val) && val >= 0 && val <= 1) {
+                        P[i][j] = val;
+                    }
+                }
+            }
+            alert('✅ Matriz completa salva com sucesso!');
+            validateMatriz();
+            runSimulation();
+        }
+
+        function validateMatriz() {
+            let html = '<div class="info-box"><h4>Validação da Matriz</h4><table><thead><tr><th>Estado</th><th>Soma</th><th>Status</th></tr></thead><tbody>';
+            let todosValidos = true;
+
+            for (let i = 0; i < 9; i++) {
+                const soma = P[i].reduce((a, b) => a + b, 0);
+                const valido = Math.abs(soma - 1.0) < 0.01;
+                if (!valido) todosValidos = false;
+                
+                html += `<tr>
+                    <td><strong>${estados[i]}</strong></td>
+                    <td>${soma.toFixed(4)}</td>
+                    <td>${valido ? '✅ OK' : '❌ Erro'}</td>
+                </tr>`;
+            }
+
+            html += '</tbody></table>';
+            
+            if (todosValidos) {
+                html += '<p style="color: green; font-weight: bold;">✅ Todas as linhas somam aproximadamente 1.0. Matriz válida!</p>';
+            } else {
+                html += '<p style="color: red; font-weight: bold;">❌ Algumas linhas não somam 1.0. Ajuste os valores para que cada linha some aproximadamente 1.0.</p>';
+            }
+            
+            html += '</div>';
+            document.getElementById('validacao-resultado').innerHTML = html;
+        }
+
+        function resetToDefaults() {
+            P = JSON.parse(JSON.stringify(P_DEFAULT));
+            prevalenciasInicial = [...PREV_DEFAULT];
+            initEditTables();
+            runSimulation();
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabName === 'parametros') {
+                initEditTables();
+            } else if (tabName === 'matriz') {
+                plotHeatmap();
+                createEditableMatriz();
+            } else if (tabName === 'estatisticas') {
+                plotEstatisticas();
+            }
+        }
+
+        function updateAnos(value) {
+            anosSimulacao = parseInt(value);
+            document.getElementById('anos-value').textContent = value;
+        }
+
+        function multiplyMatrixVector(matrix, vector) {
+            return matrix[0].map((_, colIndex) => 
+                vector.reduce((sum, val, rowIndex) => 
+                    sum + val * matrix[rowIndex][colIndex], 0
+                )
+            );
+        }
+
+        function runSimulation() {
+            const anos = anosSimulacao;
+            const prevalencias = [prevalenciasInicial.slice()];
+            
+            for (let t = 0; t < anos; t++) {
+                const prev = prevalencias[prevalencias.length - 1];
+                const newPrev = multiplyMatrixVector(P, prev);
+                prevalencias.push(newPrev);
+            }
+
+            plotEvolucao(prevalencias, anos);
+            plotArea(prevalencias, anos);
+            createPrevalenciasTable(prevalencias, anos);
+        }
+
+        function plotEvolucao(prevalencias, anos) {
+            const traces = [];
+            
+            for (let i = 0; i < 8; i++) {
+                const y = prevalencias.map(p => p[i] * 100);
+                traces.push({
+                    x: Array.from({length: anos + 1}, (_, i) => i),
+                    y: y,
+                    mode: 'lines+markers',
+                    name: estados[i],
+                    line: {color: cores[i], width: 2},
+                    marker: {size: 6}
+                });
+            }
+
+            const layout = {
+                title: 'Evolução das Prevalências ao Longo do Tempo',
+                xaxis: {title: 'Anos'},
+                yaxis: {title: 'Prevalência (%)'},
+                hovermode: 'x unified',
+                height: 500
+            };
+
+            Plotly.newPlot('chart-evolucao', traces, layout, {responsive: true});
+        }
+
+        function plotArea(prevalencias, anos) {
+            const traces = [];
+            
+            for (let i = 7; i >= 0; i--) {
+                const y = prevalencias.map(p => p[i] * 100);
+                traces.push({
+                    x: Array.from({length: anos + 1}, (_, i) => i),
+                    y: y,
+                    name: estados[i],
+                    type: 'scatter',
+                    mode: 'lines',
+                    stackgroup: 'one',
+                    fillcolor: cores[i],
+                    line: {width: 0}
+                });
+            }
+
+            const layout = {
+                title: 'Distribuição da População por Estágio',
+                xaxis: {title: 'Anos'},
+                yaxis: {title: 'Prevalência Acumulada (%)'},
+                hovermode: 'x unified',
+                height: 500
+            };
+
+            Plotly.newPlot('chart-area', traces, layout, {responsive: true});
+        }
+
+        function createPrevalenciasTable(prevalencias, anos) {
+            let html = '<table><thead><tr><th>Ano</th>';
+            estados.forEach(e => html += `<th>${e}</th>`);
+            html += '</tr></thead><tbody>';
+
+            prevalencias.forEach((prev, ano) => {
+                html += `<tr><td>${ano}</td>`;
+                prev.forEach(p => html += `<td>${(p * 100).toFixed(3)}</td>`);
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('tabela-prevalencias').innerHTML = html;
+        }
+
+        function plotHeatmap() {
+            const data = [{
+                z: P,
+                x: estados,
+                y: estados,
+                type: 'heatmap',
+                colorscale: 'YlOrRd',
+                text: P.map(row => row.map(val => val.toFixed(3))),
+                texttemplate: '%{text}',
+                textfont: {size: 10},
+                colorbar: {title: 'Probabilidade'}
+            }];
+
+            const layout = {
+                title: 'Matriz de Transição Anual (Heatmap)',
+                xaxis: {title: 'Estado Destino'},
+                yaxis: {title: 'Estado Origem'},
+                height: 600
+            };
+
+            Plotly.newPlot('chart-heatmap', data, layout, {responsive: true});
+        }
+
+        function calcularExpectativaVida(estadoInicial) {
+            let estado = new Array(9).fill(0);
+            estado[estadoInicial] = 1.0;
+            let anosVividos = 0;
+            
+            for (let ano = 0; ano < 50; ano++) {
+                if (estado[8] >= 0.99) break;
+                estado = multiplyMatrixVector(P, estado);
+                anosVividos += (1 - estado[8]);
+            }
+            
+            return anosVividos;
+        }
+
+        function plotEstatisticas() {
+            const expectativas = [];
+            for (let i = 0; i < 8; i++) {
+                expectativas.push(calcularExpectativaVida(i));
+            }
+
+            const trace = {
+                x: estados.slice(0, 8),
+                y: expectativas,
+                type: 'bar',
+                marker: {color: cores.slice(0, 8)},
+                text: expectativas.map(e => e.toFixed(1)),
+                textposition: 'outside'
+            };
+
+            const layout = {
+                title: 'Expectativa de Vida Remanescente por Estado',
+                xaxis: {title: 'Estado de Saúde'},
+                yaxis: {title: 'Anos'},
+                height: 400
+            };
+
+            Plotly.newPlot('chart-expectativa', [trace], layout, {responsive: true});
+
+            const anos = 20;
+            const prevalencias = [prevalenciasInicial.slice()];
+            for (let t = 0; t < anos; t++) {
+                const prev = prevalencias[prevalencias.length - 1];
+                prevalencias.push(multiplyMatrixVector(P, prev));
+            }
+
+            const stats = [
+                {label: 'Prevalência DRC (G1-G5) - Ano 0', value: (prevalencias[0].slice(0, 6).reduce((a, b) => a + b, 0) * 100).toFixed(2) + '%'},
+                {label: 'Prevalência DRC (G1-G5) - Ano 20', value: (prevalencias[20].slice(0, 6).reduce((a, b) => a + b, 0) * 100).toFixed(2) + '%'},
+                {label: 'Prevalência Diálise - Ano 0', value: (prevalencias[0][6] * 100).toFixed(3) + '%'},
+                {label: 'Prevalência Diálise - Ano 20', value: (prevalencias[20][6] * 100).toFixed(3) + '%'},
+                {label: 'Prevalência Transplante - Ano 0', value: (prevalencias[0][7] * 100).toFixed(3) + '%'},
+                {label: 'Prevalência Transplante - Ano 20', value: (prevalencias[20][7] * 100).toFixed(3) + '%'}
+            ];
+
+            let html = '';
+            stats.forEach(stat => {
+                html += `<div class="stat-card">
+                    <h3>${stat.label}</h3>
+                    <div class="value">${stat.value}</div>
+                </div>`;
+            });
+            document.getElementById('stats-cards').innerHTML = html;
+
+            createTransitionTables();
+        }
+
+        function createTransitionTables() {
+            const progressoes = [
+                ['G1 → G2', P[0][1]],
+                ['G2 → G3a', P[1][2]],
+                ['G3a → G3b', P[2][3]],
+                ['G3b → G4', P[3][4]],
+                ['G4 → G5', P[4][5]],
+                ['G5 → Diálise', P[5][6]]
+            ];
+
+            let html = '<thead><tr><th>Transição</th><th>Probabilidade</th></tr></thead><tbody>';
+            progressoes.forEach(([trans, prob]) => {
+                html += `<tr><td>${trans}</td><td>${(prob * 100).toFixed(1)}%</td></tr>`;
+            });
+            html += '</tbody>';
+            document.getElementById('tabela-progressao').innerHTML = html;
+
+            const regressoes = [
+                ['G2 → G1', P[1][0]],
+                ['G3a → G2', P[2][1]],
+                ['G3b → G3a', P[3][2]],
+                ['G4 → G3b', P[4][3]]
+            ];
+
+            html = '<thead><tr><th>Transição</th><th>Probabilidade</th></tr></thead><tbody>';
+            regressoes.forEach(([trans, prob]) => {
+                html += `<tr><td>${trans}</td><td>${(prob * 100).toFixed(1)}%</td></tr>`;
+            });
+            html += '</tbody>';
+            document.getElementById('tabela-regressao').innerHTML = html;
+
+            html = '<thead><tr><th>Estado</th><th>Mortalidade Anual</th></tr></thead><tbody>';
+            for (let i = 0; i < 8; i++) {
+                html += `<tr><td>${estados[i]}</td><td>${(P[i][8] * 100).toFixed(1)}%</td></tr>`;
+            }
+            html += '</tbody>';
+            document.getElementById('tabela-mortalidade').innerHTML = html;
+        }
+
+        window.onload = function() {
+            initEditTables();
+            runSimulation();
+        };
+    </script>
+</body>
+</html>
+
